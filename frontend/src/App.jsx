@@ -22,7 +22,8 @@ function App() {
       const formData = new FormData();
       formData.append("url", url);
 
-      const res = await axios.post("http://localhost:8000/generate", formData);
+      const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
+      const res = await axios.post(`${API_URL}/generate`, formData);
       setFlashcards(res.data.flashcards || []);
     } catch (err) {
       setError("Backend error – check terminal. Common: missing GROQ_API_KEY or yt-dlp issue");
