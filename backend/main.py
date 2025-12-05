@@ -44,35 +44,37 @@ async def extract_text(url: str) -> str:
             'quiet': True,
             'no_warnings': True,
             'outtmpl': 'audio.%(ext)s',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'wav',
-            }],
+            # Remove the whole postprocessor block → no ffmpeg needed!
+            'postprocessors': [],  # ← THIS IS THE FIX
+            'prefer_ffmpeg': False,
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            audio_file = "audio.wav"
-            
-        # Transcribe with Groq Whisper (free!)
-        with open(audio_file, "rb") as f:
+            # Find the downloaded file (usually .webm or .m4a)
+            downloaded_file = next(
+                f for f in os.listdir(".") if f.startswith("audio.")
+            )
+
+        # Groq Whisper accepts webm/m4a/mp3 directly — no conversion needed
+        with open(downloaded_file, "rb") as f:
             transcription = client.audio.transcriptions.create(
                 model="whisper-large-v3",
                 file=f,
                 response_format="text"
             )
-        os.remove(audio_file)
-        return transcription
+        os.remove(downloaded_file)
+        return transcription.text if hasattr(transcription, 'text') else transcription
     else:
-        # Simple article scraper (we'll improve later)
+        # Article handling stays the same
         import requests
         from bs4 import BeautifulSoup
         html = requests.get(url).text
         soup = BeautifulSoup(html, 'html.parser')
         return soup.get_text()[:15000]
-
+    
 async def create_flashcards(text: str):
     response = client.chat.completions.create(
-        model="llama3-70b-8192",
+        model="llama-3.3-70b-versatile",
         messages=[
             {"role": "system", "content": "You are an expert flashcard creator. Create 15-25 high-quality flashcards from the text. Output ONLY JSON array of objects with 'front' and 'back' keys. No explanations."},
             {"role": "user", "content": f"Text: {text[:12000]}"}
